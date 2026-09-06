@@ -1,11 +1,13 @@
 # Spotify Web API — Postman Test Suite 🎵
 
-Набор автоматизированных проверок и запросов для тестирования контрактов и бизнес-логики Spotify Web API.
+Набор автоматизированных проверок и запросов для тестирования контрактов, обработки ошибок и бизнес-логики Spotify Web API.
 
 ## 🛠 Технический стек
 * **Инструмент:** Postman
 * **Протокол:** REST, OAuth 2.0 (Client Credentials Flow)
 * **Скрипты:** JavaScript (Chai Assertion Library)
+
+---
 
 ## 🔐 Архитектура безопасности и авторизация
 В проекте реализованы практики безопасности (Security Best Practices) по защите чувствительных данных при интеграции со сторонними сервисами:
@@ -17,7 +19,7 @@
 
 ### 2. Автоматизация токенов (Request Chaining)
 Реализован автоматический флоу обновления Bearer-токена (TTL: 3600 сек). 
-В запросе авторизации написан `Post-response` скрипт, который парсит JSON ответа сервера и динамически перезаписывает переменную коллекции `access_token`.
+В запросе авторизации написан `Post-response` скрипт, который парсит JSON ответа сервера и динамически перезаписывает переменную коллекции `access_token`:
 
 ```javascript
 const response = pm.response.json();
@@ -30,8 +32,8 @@ if (response.access_token) {
 
 ### 3. Маршрутизация через переменные
 Базовые домены вынесены в переменные коллекции для удобного управления окружением:
-* `{{base_url}}` — `[https://api.spotify.com](https://api.spotify.com)`
-* `{{auth_url}}` — `[https://accounts.spotify.com](https://accounts.spotify.com)`
+* `{{base_url}}` — `https://api.spotify.com`
+* `{{auth_url}}` — `https://accounts.spotify.com`
 
 ---
 
@@ -42,7 +44,7 @@ if (response.access_token) {
 * **GET Artist by ID**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8`
   * **Статус:** `200 OK`
-  * **Проверки (Assertions):**
+  * **Проверки:**
     * Валидация наличия обязательных ключей профиля артиста (`id`, `name`).
     * Тестирование производительности: время отклика не превышает допустимый порог (`responseTime < 1000ms`).
 
@@ -51,54 +53,62 @@ if (response.access_token) {
 * **[Negative] GET Artist - Invalid ID**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/invalid_id_123`
   * **Ожидаемый статус:** `400 Bad Request`
-  * **Техника тест-дизайна:** Эквивалентное разбиение (передача некорректного формата Base62).
   * **Проверки:**
-    * `pm.response.to.have.status(400)`
-    * Наличие объекта ошибки: `jsonData.error`
-    * Точное системное сообщение: `jsonData.error.message === "Invalid base62 id"`
-    * Код статуса в теле ответа: `jsonData.error.status === 400`
+    * Статус ответа `400`.
+    * Проверка структуры ошибки и сообщения: `jsonData.error.message === "Invalid base62 id"`.
+    * Соответствие внутреннего кода: `jsonData.error.status === 400`.
 
 * **[Negative] GET Artist - Non-existing ID**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/0000000000000000000000`
   * **Ожидаемый статус:** `404 Not Found`
-  * **Техника тест-дизайна:** Анализ граничных значений (синтаксически валидный 22-значный ID, отсутствующий в БД).
   * **Проверки:**
-    * `pm.response.to.have.status(404)`
-    * `jsonData.error.status === 404`
-    * Сообщение об отсутствии записи: `jsonData.error.message === "Resource not found"`
+    * Статус ответа `404`.
+    * Валидация сообщения: `jsonData.error.message === "Resource not found"`.
+    * Соответствие внутреннего кода: `jsonData.error.status === 404`.
 
 * **[Negative] GET Artist - Invalid / Expired Token**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/0000000000000000000000`
-  * **Заголовки:** Модифицированный заголовок `Authorization: Bearer <tampered_token>`
+  * **Заголовки:** Модифицированный `Authorization: Bearer <tampered_token>`
   * **Ожидаемый статус:** `401 Unauthorized`
-  * **Техника тест-дизайна:** Security Testing (инъекция невалидного токена).
   * **Проверки:**
-    * `pm.response.to.have.status(401)`
-    * `jsonData.error.status === 401`
-    * Ответ подсистемы аутентификации: `jsonData.error.message === "Missing/invalid/expired access token"`
+    * Статус ответа `401`.
+    * Валидация сообщения системы безопасности: `jsonData.error.message === "Missing/invalid/expired access token"`.
+    * Соответствие внутреннего кода: `jsonData.error.status === 401`.
 
 * **[403] GET Artist - Top Tracks (Forbidden Scope)**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/top-tracks`
   * **Ожидаемый статус:** `403 Forbidden`
-  * **Техника тест-дизайна:** Проверка ролевой модели доступа (RBAC) и ограничений прав доступа клиентского токена.
   * **Проверки:**
-    * `pm.response.to.have.status(403)`
-    * `jsonData.error.status === 403`
-    * Системное уведомление о запрете действия: `jsonData.error.message === "Forbidden"`
+    * Статус ответа `403` при попытке доступа к ресурсу с недостаточными правами токена.
+    * Валидация тела ответа: `jsonData.error.message === "Forbidden"`.
 
-### 3. Контрактное тестирование схемы и пагинации (Schema Validation)
+### 3. Контрактное тестирование схемы и пагинации (Contract Testing)
 
 * **GET Artist's Albums**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums`
   * **Статус:** `200 OK`
-  * **Проверки структуры (Contract Testing):**
-    * Проверка обязательных корневых полей: `href`, `limit`, `next`, `offset`, `previous`, `total`, `items`.
-  * **Специфика типизации (JavaScript / Chai):**
-    * Валидация числовых счетчиков (`limit`, `offset`, `total`) через тип `number`.
-    * Проверка ссылок навигации (`href`, `next`) на тип `string`.
-    * Проверка контейнера сущностей `items` на тип `array`.
-  * **Граничные состояния (Boundary Value Analysis):**
-    * Для начальной страницы выборки (`offset = 0`) поле навигации назад строго валидируется на значение `null` (`pm.expect(jsonData.previous).to.be.null`).
+  * **Проверки пагинации (Pagination Metadata):**
+    * Валидация обязательных корневых полей: `href`, `limit`, `next`, `offset`, `previous`, `total`, `items`.
+    * Валидация типов данных (`number`, `string`, `array`).
+    * Проверка граничного состояния первого смещения (`offset = 0`): поле `previous` строго равно `null`.
+  * **Проверка контракта объекта альбома (Album Object Contract):**
+    * Защитная проверка: подтверждение непустого массива `items`.
+    * Валидация наличия обязательных атрибутов сущности: `id`, `name`, `album_type`, `total_tracks`, `release_date`, `release_date_precision`, `type`, `uri`, `external_urls`, `images`, `artists`.
+    * Проверка перечислений (Enums):
+      * `album_type` $\in$ `["album", "single", "compilation"]`
+      * `release_date_precision` $\in$ `["year", "month", "day"]`
+      * `type === "album"`
+
+---
+
+## 🐛 Выявленные дефекты спецификации (Contract Drift / Bug Reports)
+
+В ходе валидации контракта ответа `GET /v1/artists/{id}/albums` на соответствие официальной спецификации Spotify Web API обнаружены расхождения между документацией и фактическим поведением бэкенда:
+
+| Поле | Статус в документации | Фактическое поведение API | Описание проблемы |
+| :--- | :--- | :--- | :--- |
+| `available_markets` | `Required`, `Deprecated` | **Отсутствует в ответе** | Свойство выведено из эксплуатации на бэкенде, но в схеме документации ошибочно сохраняет флаг `Required`. Вызывает падение автотестов строгой валидации. |
+| `album_group` | `Required`, `Deprecated` | **Отсутствует в ответе** | Свойство устарело и не возвращается сервером, однако спецификация требует его обязательного присутствия. |
 
 ---
 
@@ -108,3 +118,4 @@ if (response.access_token) {
 3. Перейдите во вкладку **Variables** коллекции в Postman.
 4. Вставьте ваши `Client ID` и `Client Secret` в колонку **Value**.
 5. Выполните запрос `POST Request an access token`, чтобы инициализировать сессию.
+6. Запустите коллекцию через **Collection Runner**.

@@ -6,6 +6,7 @@
 * **Инструмент:** Postman
 * **Протокол:** REST, OAuth 2.0 (Client Credentials Flow)
 * **Скрипты:** JavaScript (Chai Assertion Library)
+* **Методологии тест-дизайна:** Boundary Value Analysis (BVA), Equivalence Partitioning (EP), Schema Validation
 
 ---
 
@@ -18,8 +19,7 @@
 * Для локального запуска реальные ключи подставляются в **Value**, что исключает их утечку в публичный репозиторий.
 
 ### 2. Автоматизация токенов (Request Chaining)
-Реализован автоматический флоу обновления Bearer-токена (TTL: 3600 сек). 
-В запросе авторизации написан `Post-response` скрипт, который парсит JSON ответа сервера и динамически перезаписывает переменную коллекции `access_token`:
+Реализован автоматический флоу обновления Bearer-токена (TTL: 3600 сек). В запросе авторизации написан `Post-response` скрипт, который парсит JSON ответа сервера и динамически перезаписывает переменную коллекции `access_token`:
 
 ```javascript
 const response = pm.response.json();
@@ -48,53 +48,63 @@ if (response.access_token) {
     * Валидация наличия обязательных ключей профиля артиста (`id`, `name`).
     * Тестирование производительности: время отклика не превышает допустимый порог (`responseTime < 1000ms`).
 
-### 2. Негативное тестирование и безопасность (Negative & Security Suite)
+### 2. Негативное тестирование и валидация параметров (Negative & Security Suite)
 
+#### Аутентификация и маршрутизация ID
 * **[Negative] GET Artist - Invalid ID**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/invalid_id_123`
   * **Ожидаемый статус:** `400 Bad Request`
-  * **Проверки:**
-    * Статус ответа `400`.
-    * Проверка структуры ошибки и сообщения: `jsonData.error.message === "Invalid base62 id"`.
-    * Соответствие внутреннего кода: `jsonData.error.status === 400`.
+  * **Проверки:** соответствие `status === 400` и сообщения `message === "Invalid base62 id"`.
 
 * **[Negative] GET Artist - Non-existing ID**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/0000000000000000000000`
   * **Ожидаемый статус:** `404 Not Found`
-  * **Проверки:**
-    * Статус ответа `404`.
-    * Валидация сообщения: `jsonData.error.message === "Resource not found"`.
-    * Соответствие внутреннего кода: `jsonData.error.status === 404`.
+  * **Проверки:** соответствие `status === 404` и сообщения `message === "Resource not found"`.
 
 * **[Negative] GET Artist - Invalid / Expired Token**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/0000000000000000000000`
   * **Заголовки:** Модифицированный `Authorization: Bearer <tampered_token>`
   * **Ожидаемый статус:** `401 Unauthorized`
-  * **Проверки:**
-    * Статус ответа `401`.
-    * Валидация сообщения системы безопасности: `jsonData.error.message === "Missing/invalid/expired access token"`.
-    * Соответствие внутреннего кода: `jsonData.error.status === 401`.
+  * **Проверки:** соответствие `status === 401` и валидация сообщения системы безопасности: `"Missing/invalid/expired access token"`.
 
 * **[403] GET Artist - Top Tracks (Forbidden Scope)**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/top-tracks`
   * **Ожидаемый статус:** `403 Forbidden`
-  * **Проверки:**
-    * Статус ответа `403` при попытке доступа к ресурсу с недостаточными правами токена.
-    * Валидация тела ответа: `jsonData.error.message === "Forbidden"`.
+  * **Проверки:** подтверждение недоступности ручки без пользовательского скоупа авторизации.
+
+#### Граничные значения пагинации (BVA & Type Validation: `limit`)
+* **[Negative] GET Artist's Albums - Limit Below Minimum (0)**
+  * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=0`
+  * **Ожидаемый статус:** `400 Bad Request`
+  * **Проверки:** валидация ошибки выхода за нижнюю границу (`message === "Invalid limit"`).
+
+* **[Negative] GET Artist's Albums - Limit Above Maximum (11)**
+  * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=11`
+  * **Ожидаемый статус:** `400 Bad Request`
+  * **Проверки:** валидация ошибки выхода за верхнюю границу допустимого диапазона 1–10.
+
+* **[Negative] GET Artist's Albums - Invalid Limit Format**
+  * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=invalid`
+  * **Ожидаемый статус:** `400 Bad Request`
+  * **Проверки:** обработка строкового типа данных в целочисленном параметре (`status === 400`, `message === "Invalid limit"`).
+
+> **Заметка по архитектуре валидации (Exploratory Findings):**
+> * **Санитаризация (Input Trimming & Fallback):** передача пустого значения или строки из пробелов (`?limit=%20`) не ломает запрос, а откатывается к поведению по умолчанию (`Default: limit=5`, статус `200 OK`).
+> * **Сетевой уровень (Edge Gateway):** передача недопустимых символов протокола URL (`&&^*&^`) отсекается обратным прокси на сетевом уровне со статусом `400 Bad Request` до передачи запроса в ядро бэкенда.
 
 ### 3. Контрактное тестирование схемы и пагинации (Contract Testing)
 
 * **GET Artist's Albums**
   * **Эндпоинт:** `GET {{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums`
   * **Статус:** `200 OK`
-  * **Проверки пагинации (Pagination Metadata):**
+  * **Проверки метаданных пагинации:**
     * Валидация обязательных корневых полей: `href`, `limit`, `next`, `offset`, `previous`, `total`, `items`.
     * Валидация типов данных (`number`, `string`, `array`).
-    * Проверка граничного состояния первого смещения (`offset = 0`): поле `previous` строго равно `null`.
-  * **Проверка контракта объекта альбома (Album Object Contract):**
-    * Защитная проверка: подтверждение непустого массива `items`.
+    * Проверка граничного состояния начального смещения (`offset = 0`): поле `previous` строго равно `null`.
+  * **Проверка контракта объекта альбома (`SimplifiedAlbumObject`):**
+    * Защитная проверка: массив `items` не пуст.
     * Валидация наличия обязательных атрибутов сущности: `id`, `name`, `album_type`, `total_tracks`, `release_date`, `release_date_precision`, `type`, `uri`, `external_urls`, `images`, `artists`.
-    * Проверка перечислений (Enums):
+    * Проверка допустимых значений (Enums):
       * `album_type` $\in$ `["album", "single", "compilation"]`
       * `release_date_precision` $\in$ `["year", "month", "day"]`
       * `type === "album"`
@@ -105,11 +115,11 @@ if (response.access_token) {
 
 В ходе валидации контракта ответа `GET /v1/artists/{id}/albums` на соответствие официальной спецификации Spotify Web API обнаружены расхождения между документацией и фактическим поведением бэкенда:
 
-| Поле | Статус в документации | Фактическое поведение API | Описание проблемы |
+| Поле / Параметр | Статус в документации | Фактическое поведение API | Описание проблемы |
 | :--- | :--- | :--- | :--- |
 | `available_markets` | `Required`, `Deprecated` | **Отсутствует в ответе** | Свойство выведено из эксплуатации на бэкенде, но в схеме документации ошибочно сохраняет флаг `Required`. Вызывает падение автотестов строгой валидации. |
 | `album_group` | `Required`, `Deprecated` | **Отсутствует в ответе** | Свойство устарело и не возвращается сервером, однако спецификация требует его обязательного присутствия. |
-| `limit` *(query param)* | `Minimum: 1`, но `Range: 0 - 10` | **Внутреннее противоречие** | В текстовом описании минимальным порогом заявлена единица (`Minimum: 1`), однако блок допустимого диапазона разрешает ноль (`Range: 0 - 10`). Спецификация противоречит сама себе. |
+| `limit` *(query param)* | `Minimum: 1`, но `Range: 0 - 10` | **Внутреннее противоречие** | В текстовом описании минимальным порогом заявлена единица (`Minimum: 1`), однако блок допустимого диапазона разрешает ноль (`Range: 0 - 10`). При передаче `limit=0` сервер возвращает ошибку `400 Bad Request`. |
 
 ---
 

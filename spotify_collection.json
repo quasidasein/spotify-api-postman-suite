@@ -1,0 +1,465 @@
+{
+  "info": {
+    "_postman_id": "834fd82e-593b-4ee5-b6ac-83b7346359cb",
+    "name": "Spotify Web API — QA Test Suite",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "56530851",
+    "_collection_link": "https://go.postman.co/collection/56530851-834fd82e-593b-4ee5-b6ac-83b7346359cb?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Request an access token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const response = pm.response.json();\r\n\r\nif (response.access_token) {\r\n    pm.collectionVariables.set(\"access_token\", response.access_token);\r\n}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "grant_type=client_credentials&client_id={{client_id}}&client_secret={{client_secret}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{auth_url}}/api/token",
+          "host": [
+            "{{auth_url}}"
+          ],
+          "path": [
+            "api",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET Artist by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\npm.test(\"Response contains required artist fields\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.have.property(\"id\");\r\n    pm.expect(jsonData).to.have.property(\"name\");\r\n});\r\npm.test(\"Response time is under 1000ms\", function () {\r\n    pm.expect(pm.response.responseTime).to.be.below(1000);\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist - Invalid ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Error body contains invalid id message\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.message).to.eql(\"Invalid base62 id\");\r\n    pm.expect(jsonData.error.status).to.eql(400);\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/artists/invalid_id_123",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "invalid_id_123"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist - Non-existing ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 404\", function () {\r\n    pm.response.to.have.status(404);\r\n});\r\n\r\npm.test(\"Error body indicates non-existing resource\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.status).to.eql(404);\r\n    pm.expect(jsonData.error.message).to.eql(\"Resource not found\");\r\n}); \r\n\r\n"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/0000000000000000000000",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "0000000000000000000000"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist - Invalid / Expired Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 401\", function () {\r\n    pm.response.to.have.status(401);\r\n});\r\n\r\npm.test(\"Error body indicates missing or invalid token\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.status).to.eql(401);\r\n    pm.expect(jsonData.error.message).to.eql(\"Missing/invalid/expired access token\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{bearer_token_061w}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/0000000000000000000000",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "0000000000000000000000"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[403] GET Artist - Top Tracks (Forbidden Scope)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 403\", function () {\r\n    pm.response.to.have.status(403);\r\n});\r\n\r\npm.test(\"Error message is Forbidden\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData.error.status).to.eql(403);\r\n    pm.expect(jsonData.error.message).to.eql(\"Forbidden\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/top-tracks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "top-tracks"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET Artist's Albums",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Validate pagination metadata schema\", function () {\r\n    const jsonData = pm.response.json();\r\n\r\n    // Verify required root-level properties\r\n    pm.expect(jsonData).to.have.property(\"href\");\r\n    pm.expect(jsonData).to.have.property(\"limit\");\r\n    pm.expect(jsonData).to.have.property(\"next\");\r\n    pm.expect(jsonData).to.have.property(\"offset\");\r\n    pm.expect(jsonData).to.have.property(\"previous\");\r\n    pm.expect(jsonData).to.have.property(\"total\");\r\n    pm.expect(jsonData).to.have.property(\"items\");\r\n\r\n    // Verify data types\r\n    pm.expect(jsonData.href).to.be.a(\"string\");\r\n    pm.expect(jsonData.limit).to.be.a(\"number\");\r\n    pm.expect(jsonData.next).to.be.a(\"string\");\r\n    pm.expect(jsonData.offset).to.be.a(\"number\");\r\n    pm.expect(jsonData.previous).to.be.null;\r\n    pm.expect(jsonData.total).to.be.a(\"number\");\r\n    pm.expect(jsonData.items).to.be.an(\"array\");\r\n});\r\npm.test(\"Album object contains valid properties and types\", function () {\r\n    const jsonData = pm.response.json();\r\n\r\n    // Guard assertion: ensure items array is not empty before indexing\r\n    pm.expect(jsonData.items).to.be.an(\"array\").that.is.not.empty;\r\n\r\n    const album = jsonData.items[0];\r\n\r\n    // 1. Verify required properties\r\n    pm.expect(album).to.have.property(\"album_type\");\r\n    pm.expect(album).to.have.property(\"total_tracks\");\r\n    pm.expect(album).to.have.property(\"external_urls\");\r\n    pm.expect(album).to.have.property(\"href\");\r\n    pm.expect(album).to.have.property(\"id\");\r\n    pm.expect(album).to.have.property(\"images\");\r\n    pm.expect(album).to.have.property(\"name\");\r\n    pm.expect(album).to.have.property(\"release_date\");\r\n    pm.expect(album).to.have.property(\"release_date_precision\");\r\n    pm.expect(album).to.have.property(\"type\");\r\n    pm.expect(album).to.have.property(\"uri\");\r\n    pm.expect(album).to.have.property(\"artists\");\r\n   \r\n\r\n    // 2. Validate data types\r\n    pm.expect(album.album_type).to.be.a(\"string\");\r\n    pm.expect(album.total_tracks).to.be.a(\"number\"); // Specification integer maps to JS number\r\n\r\n    pm.expect(album.external_urls).to.be.an(\"object\");\r\n    pm.expect(album.href).to.be.a(\"string\");\r\n    pm.expect(album.id).to.be.a(\"string\");\r\n    pm.expect(album.images).to.be.an(\"array\");\r\n    pm.expect(album.name).to.be.a(\"string\");\r\n    pm.expect(album.release_date).to.be.a(\"string\");\r\n    pm.expect(album.release_date_precision).to.be.a(\"string\");\r\n    pm.expect(album.type).to.be.a(\"string\");\r\n    pm.expect(album.uri).to.be.a(\"string\");\r\n    pm.expect(album.artists).to.be.an(\"array\");\r\n\r\n    // 3. Validate allowed values (Enums)\r\n    pm.expect(album.album_type).to.be.oneOf([\"album\", \"single\", \"compilation\"]);\r\n    pm.expect(album.release_date_precision).to.be.oneOf([\"year\", \"month\", \"day\"]);\r\n    pm.expect(album.type).to.eql(\"album\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "albums"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Boundary] GET Artist's Albums - Out of Bounds Offset",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// 1. Verify server responds with HTTP 200 OK without crashing on large offset\r\npm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\n// 2. Verify items array is empty since requested offset exceeds total albums\r\npm.test(\"Items array is empty for out-of-bounds offset\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData.items).to.be.an(\"array\").that.is.empty;\r\n});\r\n\r\n// 3. Verify forward pagination is disabled (no more items exist)\r\npm.test(\"Next page link is null\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData.next).to.be.null;\r\n});\r\n\r\n// 4. Verify backward pagination link exists as a URL string to allow navigation back\r\npm.test(\"Previous page link is present\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData.previous).to.be.a(\"string\");\r\n});\r\n\r\n// 5. Verify server explicitly applied and returned the requested offset value\r\npm.test(\"Offset in response echoes the requested offset\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData.offset).to.eql(100000);\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?offset=100000",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "albums"
+          ],
+          "query": [
+            {
+              "key": "offset",
+              "value": "100000"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist's Albums - Limit Below Minimum (0)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Error payload matches invalid limit schema\", function () {\r\n    const jsonData = pm.response.json();\r\n    \r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.status).to.eql(400);\r\n    pm.expect(jsonData.error.message).to.eql(\"Invalid limit\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=0",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "albums"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist's Albums - Limit Above Maximum (11)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Error payload matches invalid limit schema\", function () {\r\n    const jsonData = pm.response.json();\r\n    \r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.status).to.eql(400);\r\n    pm.expect(jsonData.error.message).to.eql(\"Invalid limit\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=11",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "albums"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "11"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[Negative] GET Artist's Albums - Invalid Limit Format",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Error payload matches invalid limit schema\", function () {\r\n    const jsonData = pm.response.json();\r\n    \r\n    pm.expect(jsonData).to.have.property(\"error\");\r\n    pm.expect(jsonData.error.status).to.eql(400);\r\n    pm.expect(jsonData.error.message).to.eql(\"Invalid limit\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/artists/6TsAG8Ve1icEC8ydeHm3C8/albums?limit=invalid",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "artists",
+            "6TsAG8Ve1icEC8ydeHm3C8",
+            "albums"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "invalid"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.spotify.com"
+    },
+    {
+      "key": "auth_url",
+      "value": "https://accounts.spotify.com"
+    },
+    {
+      "key": "access_token",
+      "value": "YOUR_ACCESS_TOKEN"
+    },
+    {
+      "key": "client_id",
+      "value": "YOUR_CLIENT_ID"
+    },
+    {
+      "key": "client_secret",
+      "value": "YOUR_CLIENT_SECRET"
+    }
+  ]
+}

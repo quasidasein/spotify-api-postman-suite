@@ -1,3 +1,4 @@
+[![Spotify API Automated Tests](https://github.com/quasidasein/spotify-api-postman-suite/actions/workflows/newman.yml/badge.svg)](https://github.com/quasidasein/spotify-api-postman-suite/actions/workflows/newman.yml)
 # Spotify Web API — Postman Test Suite 🎵
 
 Набор автоматизированных проверок и запросов для тестирования контрактов, обработки ошибок и бизнес-логики Spotify Web API.

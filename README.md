@@ -119,20 +119,22 @@ if (response.access_token) {
 ### Вариант 1. Автоматический запуск в консоли (через Newman)
 
 1. Клонируйте репозиторий:
-   ```bash
-   git clone https://github.com/quasidasein/spotify-api-postman-suite.git
+```bash
+git clone https://github.com/quasidasein/spotify-api-postman-suite.git
 cd spotify-api-postman-suite
-   ```
+```
+
 2. Установите Newman (требуется Node.js):
-   ```bash
-   npm install -g newman
-   ```
+```bash
+npm install -g newman
+```
+
 3. Запустите тесты с передачей учетных данных:
-   ```bash
-   newman run spotify_collection.json \
-     --env-var "client_id=ВАШ_CLIENT_ID" \
-     --env-var "client_secret=ВАШ_CLIENT_SECRET"
-   ```
+```bash
+newman run spotify_collection.json \
+  --env-var "client_id=ВАШ_CLIENT_ID" \
+  --env-var "client_secret=ВАШ_CLIENT_SECRET"
+```
 
 ### Вариант 2. Запуск через Postman GUI
 

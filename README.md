@@ -120,8 +120,8 @@ if (response.access_token) {
 
 1. Клонируйте репозиторий:
    ```bash
-   git clone [https://github.com/quasidasein/spotify-api-postman-suite.git](https://github.com/quasidasein/spotify-api-postman-suite.git)
-   cd spotify-api-postman-suite
+   git clone https://github.com/quasidasein/spotify-api-postman-suite.git
+cd spotify-api-postman-suite
    ```
 2. Установите Newman (требуется Node.js):
    ```bash
